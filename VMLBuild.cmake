@@ -65,7 +65,7 @@ endfunction()
 
 # Compilation functions
 function(compile_mono_assembly_aot)
-    set(options OPTIMIZE DYNAMIC)
+    set(options OPTIMIZE)
     set(oneValueArgs ASSEMBLY CONFIG)
     set(multiValueArgs SOURCES REFERENCES FLAGS RESOURCES DEFINES)
 
@@ -111,10 +111,7 @@ function(compile_mono_assembly_aot)
       set(OPTIMIZE_ARGS -O=all)
     endif()
 
-    set(AOT_ARGS "full,asmonly,nodebug")
-    if(NOT MONO_DYNAMIC)
-      set(AOT_ARGS "${AOT_ARGS},static")
-    endif()
+    set(AOT_ARGS "full,asmonly,nodebug,static")
 
     add_custom_command(
         OUTPUT ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
@@ -148,6 +145,60 @@ function(compile_mono_assembly_aot)
 
     set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll.s")
     set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll")
+endfunction()
+
+# Compilation functions
+function(compile_mono_aot_dynamic)
+    set(options OPTIMIZE)
+    set(oneValueArgs ASSEMBLY STARTUP EXPORTS)
+
+    cmake_parse_arguments(MONO "${options}" "${oneValueArgs}" "" ${ARGN})
+
+    set(OPTIMIZE_ARGS "")
+    if(MONO_OPTIMIZE)
+      set(OPTIMIZE_ARGS -O=all)
+    endif()
+
+    set(AOT_ARGS "full,asmonly,nodebug")
+
+    # TODO: find a better solution to avoid conflicts
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
+        COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
+            ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
+        DEPENDS ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Preparing dynamic assembly ${MONO_ASSEMBLY}.dll"
+    )
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll.s
+        COMMAND export "MONO_PATH=${MONO_PATH}" && "WSLENV=MONO_PATH/p" "${SFV_FOLDER}/Tools/mono-xcompiler.exe" --aot=${AOT_ARGS} ${OPTIMIZE_ARGS} ${MONO_ASSEMBLY}.dynamic.dll
+        DEPENDS ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Generating dynamic AOT file for ${MONO_ASSEMBLY}.dll"
+    )
+
+    add_executable(${MONO_ASSEMBLY}-dynamic
+        ${MONO_STARTUP}
+        ${MONO_ASSEMBLY}.dynamic.dll.s
+    )
+
+    vita_create_self(${MONO_ASSEMBLY}.dll.suprx ${MONO_ASSEMBLY}-dynamic CONFIG ${MONO_EXPORTS})
+    vita_create_stubs(${CMAKE_SHARED_LIBRARY_PREFIX}VML${MONO_ASSEMBLY}_stub ${MONO_ASSEMBLY}-dynamic ${MONO_EXPORTS})
+
+    target_compile_options(${MONO_ASSEMBLY}-dynamic PRIVATE
+      $<$<COMPILE_LANGUAGE:ASM>:-Wl,-q -fvisibility=hidden -MD>
+      $<$<COMPILE_LANGUAGE:C>:-Wl,-q -fvisibility=hidden -MD>
+    )
+
+    target_link_options(${MONO_ASSEMBLY}-dynamic PRIVATE
+      $<$<COMPILE_LANGUAGE:ASM>:-Wl,-q -nostartfiles>
+      $<$<COMPILE_LANGUAGE:C>:-Wl,-q -nostartfiles>
+    )
+
+    set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll.s")
+    set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll")
 endfunction()
 
 function(compile_mono_dll_aot)
