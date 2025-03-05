@@ -65,7 +65,7 @@ endfunction()
 
 # Compilation functions
 function(compile_mono_assembly_aot)
-    set(options OPTIMIZE)
+    set(options OPTIMIZE DYNAMIC)
     set(oneValueArgs ASSEMBLY CONFIG)
     set(multiValueArgs SOURCES REFERENCES FLAGS RESOURCES DEFINES)
 
@@ -111,6 +111,11 @@ function(compile_mono_assembly_aot)
       set(OPTIMIZE_ARGS -O=all)
     endif()
 
+    set(AOT_ARGS "full,asmonly,nodebug")
+    if(NOT MONO_DYNAMIC)
+      set(AOT_ARGS "${AOT_ARGS},static")
+    endif()
+
     add_custom_command(
         OUTPUT ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
         COMMAND export "MONO_PATH='${MCS_PATH}'" && WSLENV=MONO_PATH/p mcs -sdk:2 -target:library -out:${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll ${MONO_SOURCES} -lib:${CMAKE_BINARY_DIR} ${FLAGS_ARGS} ${REFERENCE_ARGS} ${RESOURCE_ARGS} ${DEFINE_ARGS}
@@ -120,7 +125,7 @@ function(compile_mono_assembly_aot)
     )
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dll.s
-        COMMAND export "MONO_PATH=${MONO_PATH}" && "WSLENV=MONO_PATH/p" "${SFV_FOLDER}/Tools/mono-xcompiler.exe" --aot=full,asmonly,nodebug,static ${OPTIMIZE_ARGS} ${MONO_ASSEMBLY}.dll
+        COMMAND export "MONO_PATH=${MONO_PATH}" && "WSLENV=MONO_PATH/p" "${SFV_FOLDER}/Tools/mono-xcompiler.exe" --aot=${AOT_ARGS} ${OPTIMIZE_ARGS} ${MONO_ASSEMBLY}.dll
         COMMAND ${CMAKE_COMMAND} -E rename 
           ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll.s 
           "${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dll.s"
