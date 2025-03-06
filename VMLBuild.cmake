@@ -1,4 +1,5 @@
 include(CMakeParseArguments)
+include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 # Must be provided when running
 set(SFV_FOLDER "" CACHE STRING "Unity Support for Vita installation folder")
@@ -150,7 +151,7 @@ endfunction()
 # Compilation functions
 function(compile_mono_aot_dynamic)
     set(options OPTIMIZE)
-    set(oneValueArgs ASSEMBLY STARTUP EXPORTS)
+    set(oneValueArgs ASSEMBLY STARTUP EXPORTS STUBNAME)
 
     cmake_parse_arguments(MONO "${options}" "${oneValueArgs}" "" ${ARGN})
 
@@ -163,10 +164,10 @@ function(compile_mono_aot_dynamic)
 
     # TODO: find a better solution to avoid conflicts
     add_custom_command(
-        OUTPUT ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
         COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
-            ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
+            ${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
         DEPENDS ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Preparing dynamic assembly ${MONO_ASSEMBLY}.dll"
@@ -174,8 +175,8 @@ function(compile_mono_aot_dynamic)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll.s
         COMMAND export "MONO_PATH=${MONO_PATH}" && "WSLENV=MONO_PATH/p" "${SFV_FOLDER}/Tools/mono-xcompiler.exe" --aot=${AOT_ARGS} ${OPTIMIZE_ARGS} ${MONO_ASSEMBLY}.dynamic.dll
-        DEPENDS ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${MONO_ASSEMBLY}.dynamic.dll
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating dynamic AOT file for ${MONO_ASSEMBLY}.dll"
     )
 
@@ -184,8 +185,13 @@ function(compile_mono_aot_dynamic)
         ${MONO_ASSEMBLY}.dynamic.dll.s
     )
 
+    set(DYNAMIC_STUB_NAME ${CMAKE_SHARED_LIBRARY_PREFIX}VML${MONO_ASSEMBLY}_stub)
+    if(MONO_STUBNAME)
+      set(DYNAMIC_STUB_NAME ${MONO_STUBNAME})
+    endif()
+
     vita_create_self(${MONO_ASSEMBLY}.dll.suprx ${MONO_ASSEMBLY}-dynamic CONFIG ${MONO_EXPORTS})
-    vita_create_stubs(${CMAKE_SHARED_LIBRARY_PREFIX}VML${MONO_ASSEMBLY}_stub ${MONO_ASSEMBLY}-dynamic ${MONO_EXPORTS})
+    vita_create_stubs(${DYNAMIC_STUB_NAME} ${MONO_ASSEMBLY}-dynamic ${MONO_EXPORTS})
 
     target_compile_options(${MONO_ASSEMBLY}-dynamic PRIVATE
       $<$<COMPILE_LANGUAGE:ASM>:-Wl,-q -fvisibility=hidden -MD>
