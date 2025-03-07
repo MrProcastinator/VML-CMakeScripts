@@ -42,7 +42,7 @@ set(MONO_LIB_REFERENCES
 # VMLBuild script Version
 set(VMLBUILD_VERSION_MAX 0)
 set(VMLBUILD_VERSION_MIN 1)
-set(VMLBUILD_VERSION_PATCH 5)
+set(VMLBUILD_VERSION_PATCH 6)
 
 message("Using VMLBuild version ${VMLBUILD_VERSION_MAX}.${VMLBUILD_VERSION_MIN}.${VMLBUILD_VERSION_PATCH}")
 message("With Unity Support for Vita located at: '${SFV_FOLDER}'")
