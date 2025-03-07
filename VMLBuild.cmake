@@ -302,9 +302,10 @@ function(compile_mono_single_assembly_aot)
 endfunction()
 
 function(compile_mono_external_import)
-    set(oneValueArgs ASSEMBLY TARGET LIBPATH)
+    set(options DYNAMIC)
+    set(oneValueArgs ASSEMBLY TARGET LIBPATH ALIAS)
 
-    cmake_parse_arguments(MONO "" "${oneValueArgs}" "" ${ARGN})
+    cmake_parse_arguments(MONO "${options}" "${oneValueArgs}" "" ${ARGN})
 
     if(MONO_LIBPATH)
     else()
@@ -313,15 +314,36 @@ function(compile_mono_external_import)
 
     set(ASSEMBLY_PATH "${MONO_LIBPATH}/${MONO_ASSEMBLY}")
 
+    set(ASSEMBLY_NAME ${MONO_ASSEMBLY})
+    if(MONO_ALIAS)
+      set(ASSEMBLY_NAME ${MONO_ALIAS})
+    endif()
+
     add_custom_command(
         TARGET ${MONO_TARGET}
         COMMAND ${CMAKE_COMMAND} -E copy
             "${ASSEMBLY_PATH}"
-            ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}
+            ${CMAKE_BINARY_DIR}/${ASSEMBLY_NAME}
         DEPENDS "${ASSEMBLY_PATH}"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Importing assembly dependency ${MONO_ASSEMBLY}"
+        COMMENT "Importing assembly dependency ${ASSEMBLY_NAME}"
     )
 
-    set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}")
+    set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${ASSEMBLY_NAME}")
+
+    if(MONO_DYNAMIC)
+      set(DYNAMIC_ASSEMBLY_PATH "${MONO_LIBPATH}/${ASSEMBLY_NAME}.suprx")
+
+      add_custom_command(
+          TARGET ${MONO_TARGET}
+          COMMAND ${CMAKE_COMMAND} -E copy
+              "${DYNAMIC_ASSEMBLY_PATH}"
+              ${CMAKE_BINARY_DIR}/${ASSEMBLY_NAME}.suprx
+          DEPENDS "${DYNAMIC_ASSEMBLY_PATH}"
+          WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+          COMMENT "Importing dynamic assembly dependency ${ASSEMBLY_NAME}"
+      )
+
+      set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_MAKE_CLEAN_FILES};${CMAKE_BINARY_DIR}/${ASSEMBLY_NAME}.suprx")
+    endif()
 endfunction()
