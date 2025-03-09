@@ -1,5 +1,5 @@
 include(CMakeParseArguments)
-include("${VITASDK}/share/vita.cmake" REQUIRED)
+include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
 # Must be provided when running
 set(SFV_FOLDER "" CACHE STRING "Unity Support for Vita installation folder")
@@ -68,7 +68,7 @@ endfunction()
 function(compile_mono_assembly_aot)
     set(options OPTIMIZE)
     set(oneValueArgs ASSEMBLY CONFIG)
-    set(multiValueArgs SOURCES REFERENCES FLAGS RESOURCES DEFINES)
+    set(multiValueArgs SOURCES REFERENCES FLAGS RESOURCES DEFINES NEEDS)
 
     cmake_parse_arguments(MONO "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -83,6 +83,13 @@ function(compile_mono_assembly_aot)
     if(MONO_REFERENCES)
       foreach(REF ${MONO_REFERENCES})
         list(APPEND REFERENCE_ARGS -r:${REF})
+      endforeach()
+    endif()
+
+    set(NEED_DEPENDS "")
+    if(MONO_NEEDS)
+      foreach(REF ${MONO_NEEDS})
+        list(APPEND NEED_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${REF}.s)
       endforeach()
     endif()
 
@@ -117,7 +124,7 @@ function(compile_mono_assembly_aot)
     add_custom_command(
         OUTPUT ${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll
         COMMAND export "MONO_PATH='${MCS_PATH}'" && WSLENV=MONO_PATH/p mcs -sdk:2 -target:library -out:${CMAKE_BINARY_DIR}/${MONO_ASSEMBLY}.dll ${MONO_SOURCES} -lib:${CMAKE_BINARY_DIR} ${FLAGS_ARGS} ${REFERENCE_ARGS} ${RESOURCE_ARGS} ${DEFINE_ARGS}
-        DEPENDS ${MONO_SOURCES}
+        DEPENDS ${MONO_SOURCES} ${NEED_DEPENDS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Compiling assembly ${MONO_ASSEMBLY}.dll"
     )
